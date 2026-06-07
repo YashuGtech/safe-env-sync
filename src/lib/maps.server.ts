@@ -134,9 +134,12 @@ export function pickMap(
   const r = rnd(seed + levelIndex * 7919);
   const base = MAP_TEMPLATES[Math.floor(r() * MAP_TEMPLATES.length)];
 
+  const tier = tierFor(levelIndex);
   return {
     ...base,
-    pipe_gap: REF_PIPE_GAP,
+    gravity: tier.gravity,
+    jump_strength: tier.jump,
+    pipe_gap: tier.gap,
     scroll_speed: 2.5,
     pool: ["pipe"],
     build: (duration: number) =>
