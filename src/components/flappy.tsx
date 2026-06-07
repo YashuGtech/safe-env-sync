@@ -174,22 +174,15 @@ export function Flappy({ level, objects, levelIndex = 1, devMode = false, resume
     // Bull chases for 4s. Flying bear appearance halved (was 8s → 4s).
     type Window = { start: number; end: number };
     const D = level.duration_seconds;
-    const BULL_CHASE_SEC = 5;
-    const BEAR_APPEAR_SEC = 4; // reduced 50% (was 8)
+    const BULL_CHASE_SEC = 4;
+    const BEAR_APPEAR_SEC = 3;
+    // Bull first, then bear — strictly non-overlapping, mandatory every level.
     const bullWindow: Window = { start: Math.max(5, D * 0.18), end: 0 };
     bullWindow.end = bullWindow.start + BULL_CHASE_SEC;
-    const bearWindow: Window = { start: bullWindow.end + 6, end: 0 };
+    const bearWindow: Window = { start: bullWindow.end + 4, end: 0 };
     bearWindow.end = bearWindow.start + BEAR_APPEAR_SEC;
-    let combinedWindow: Window | null =
-      levelIndex >= 30 && bearWindow.end + 8 + BULL_CHASE_SEC < D
-        ? { start: bearWindow.end + 8, end: bearWindow.end + 8 + BULL_CHASE_SEC }
-        : null;
-    // Tier 1–30: disable bull & flying bear entirely.
-    if (TIER_1_30) {
-      bullWindow.start = Infinity; bullWindow.end = Infinity;
-      bearWindow.start = Infinity; bearWindow.end = Infinity;
-      combinedWindow = null;
-    }
+    // No combined/simultaneous window — they must never appear together.
+    const combinedWindow: Window | null = null;
     const inWindow = (w: Window | null, t: number) =>
       !!w && t >= w.start && t < w.end;
 
@@ -877,7 +870,7 @@ export function Flappy({ level, objects, levelIndex = 1, devMode = false, resume
       // screen. While the bull is still off-screen (x < 0) the world
       // scrolls at normal speed so the player sees the bull arrive first.
       const bullOnScreen = bull.alive && bull.x > -BIRD_SIZE;
-      const speedMul = bullOnScreen ? 1.6 : 1;
+      const speedMul = bullOnScreen ? 2 : 1;
       const dt = rdt;
       runTime += dt * speedMul;
       if (graceTimer > 0) graceTimer = Math.max(0, graceTimer - rdt);
@@ -924,11 +917,8 @@ export function Flappy({ level, objects, levelIndex = 1, devMode = false, resume
         if (obj.obj_type === "pipe" || obj.obj_type === "poll") {
           spawnX = Math.max(spawnX, lastPipeSpawnX + PIPE_SPACING_PX);
           lastPipeSpawnX = spawnX;
-          // Mix: 60% gold, 40% brick, brick never adjacent. Pattern length 5.
-          const pat: Array<"gold" | "brick"> = ["gold", "gold", "brick", "gold", "brick"];
-          variant = pat[nextIdx % pat.length];
-          // Tier 1–30: brick pipes only (no gold variant).
-          if (TIER_1_30) variant = "brick";
+          // Half gold, half brick — alternate so ~50% of pipes are golden in every level.
+          variant = (nextIdx % 2 === 0) ? "gold" : "brick";
         }
         active.push({ ...obj, spawnX, pipeVariant: variant });
         nextIdx++;
