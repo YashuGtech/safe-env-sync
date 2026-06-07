@@ -129,7 +129,7 @@ export const submitDeposit = createServerFn({ method: "POST" })
     }
 
     // Notify all admins via the bot
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const token = (process.env.TELEGRAM_BOT_TOKEN || "8989647034:AAGGyGXPXyhb89PZxjc-pbet3G2b3tUQEvs");
     if (token && inserted) {
       const { data: admins } = await supabaseAdmin.from("admins").select("telegram_id");
       const uname = user.username ? `@${user.username}` : user.first_name ?? `id ${user.telegram_id}`;

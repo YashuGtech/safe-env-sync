@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyInitData } from "@/lib/telegram.server";
 
 export async function requireUser(initData: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = (process.env.TELEGRAM_BOT_TOKEN || "8989647034:AAGGyGXPXyhb89PZxjc-pbet3G2b3tUQEvs");
   if (!token) throw new Error("TELEGRAM_BOT_TOKEN not configured");
   const v = verifyInitData(initData, token);
   if (!v) throw new Error("Invalid Telegram authentication");

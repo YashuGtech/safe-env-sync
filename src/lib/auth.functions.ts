@@ -13,7 +13,7 @@ const InitDataSchema = z.object({
 });
 
 async function authenticate(initData: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = (process.env.TELEGRAM_BOT_TOKEN || "8989647034:AAGGyGXPXyhb89PZxjc-pbet3G2b3tUQEvs");
   if (!token) throw new Error("TELEGRAM_BOT_TOKEN not configured");
   const verified = verifyInitData(initData, token);
   if (!verified) throw new Error("Invalid Telegram authentication");
