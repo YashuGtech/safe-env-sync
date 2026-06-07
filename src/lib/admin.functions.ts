@@ -413,7 +413,7 @@ export const approveDeposit = createServerFn({ method: "POST" })
     });
 
     // Notify user via bot
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const token = (process.env.TELEGRAM_BOT_TOKEN || "8989647034:AAGGyGXPXyhb89PZxjc-pbet3G2b3tUQEvs");
     if (token) {
       await sendBotMessage(
         Number(dep.user_id),
@@ -471,7 +471,7 @@ export const rejectDeposit = createServerFn({ method: "POST" })
       note: `Deposit rejected: ${data.reason}`,
     });
 
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const token = (process.env.TELEGRAM_BOT_TOKEN || "8989647034:AAGGyGXPXyhb89PZxjc-pbet3G2b3tUQEvs");
     if (token) {
       await sendBotMessage(
         Number(dep.user_id),
