@@ -59,22 +59,40 @@ const SPAWN_INTERVAL_SEC = REF_SPACING_PX / REF_SPEED_PX_PER_SEC; // ≈ 1.422 s
 const GAP_Y_MIN = (REF_OFFSET_MIN + REF_PIPE_GAP / 2) / REF_H; // ≈ 0.264
 const GAP_Y_MAX = (REF_OFFSET_MAX + REF_PIPE_GAP / 2) / REF_H; // ≈ 0.611
 
-/* ─── Map templates (background flavours only — pipes are identical) ── */
+/* ─── Difficulty tiers ─────────────────────────────────────────────
+ * Levels 1-30   → "moon" gravity (low), 8 pipe pairs, wide gap, large spacing.
+ * Levels 31-100 → "earth" gravity, 10 pipe pairs, large gap.
+ * No spikes / blades / poles — only pipes and a handful of coins.
+ */
+const MOON_GRAVITY = 0.12;
+const MOON_JUMP = -4;
+const EARTH_GRAVITY = 0.5;
+const EARTH_JUMP = -8;
+const MOON_PIPE_GAP = 280;
+const EARTH_PIPE_GAP = 240;
+
+type Tier = { pipes: number; gap: number; gravity: number; jump: number; coins: number };
+
+function tierFor(levelIndex: number): Tier {
+  if (levelIndex <= 30) {
+    return { pipes: 8, gap: MOON_PIPE_GAP, gravity: MOON_GRAVITY, jump: MOON_JUMP, coins: 20 };
+  }
+  return { pipes: 10, gap: EARTH_PIPE_GAP, gravity: EARTH_GRAVITY, jump: EARTH_JUMP, coins: 24 };
+}
+
+/* ─── Map templates (background flavours only) ── */
 export const MAP_TEMPLATES: MapTemplate[] = [
-  { id: 1,  name: "Classic Pipes",  bg_color: "#0a0a0f", bg_kind: "sunset_city", gravity: 0.5, jump_strength: -8, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
-  { id: 2,  name: "Night Run",      bg_color: "#0f0a14", bg_kind: "night_city",  gravity: 0.5, jump_strength: -8, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
-  { id: 3,  name: "Nebula",         bg_color: "#150f0a", bg_kind: "nebula",      gravity: 0.5, jump_strength: -8, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
-  { id: 4,  name: "Desert Flight",  bg_color: "#0a0f14", bg_kind: "desert",      gravity: 0.5, jump_strength: -8, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
-  { id: 5,  name: "Neon Grid",      bg_color: "#100b04", bg_kind: "neon_grid",   gravity: 0.5, jump_strength: -8, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
-  { id: 6,  name: "Aurora",         bg_color: "#14080a", bg_kind: "aurora",      gravity: 0.5, jump_strength: -8, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
+  { id: 1,  name: "Classic Pipes",  bg_color: "#0a0a0f", bg_kind: "sunset_city", gravity: EARTH_GRAVITY, jump_strength: EARTH_JUMP, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
+  { id: 2,  name: "Night Run",      bg_color: "#0f0a14", bg_kind: "night_city",  gravity: EARTH_GRAVITY, jump_strength: EARTH_JUMP, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
+  { id: 3,  name: "Nebula",         bg_color: "#150f0a", bg_kind: "nebula",      gravity: EARTH_GRAVITY, jump_strength: EARTH_JUMP, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
+  { id: 4,  name: "Desert Flight",  bg_color: "#0a0f14", bg_kind: "desert",      gravity: EARTH_GRAVITY, jump_strength: EARTH_JUMP, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
+  { id: 5,  name: "Neon Grid",      bg_color: "#100b04", bg_kind: "neon_grid",   gravity: EARTH_GRAVITY, jump_strength: EARTH_JUMP, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
+  { id: 6,  name: "Aurora",         bg_color: "#14080a", bg_kind: "aurora",      gravity: EARTH_GRAVITY, jump_strength: EARTH_JUMP, scroll_speed: 2.5, pipe_gap: REF_PIPE_GAP, pool: ["pipe"] },
 ];
 
 /**
- * Java-faithful pipe builder, with bonus obstacles from level 4 onward:
- *   • Spikes — snap to top or bottom edge, cones face the player.
- *   • Blades — hang from the ceiling on a chain, rotating saw at the bottom,
- *     positioned in the player's flight lane (not at the very top).
- * Spawned in the safe zone between pipes so the player can still pass.
+ * Simple easy pipe builder: evenly-spaced pipes across the level duration,
+ * no spikes / blades / poles, and a small sprinkle of collectible coins.
  */
 function buildPipes(
   duration: number,
@@ -83,47 +101,26 @@ function buildPipes(
 ): Omit<LevelObject, "id">[] {
   const r = rnd(seed);
   const out: Omit<LevelObject, "id">[] = [];
-  const withExtras = levelIndex >= 4;
-  // Difficulty ramps with level: more frequent extras at higher levels.
-  const spikeChance = withExtras ? Math.min(0.55, 0.25 + (levelIndex - 4) * 0.01) : 0;
-  const bladeChance = withExtras ? Math.min(0.45, 0.15 + (levelIndex - 4) * 0.008) : 0;
+  const tier = tierFor(levelIndex);
 
-  let pipeIdx = 0;
-  for (let t = 2.5; t < duration - 1.5; t += SPAWN_INTERVAL_SEC) {
+  // Spread N pipe pairs evenly between t=2 and t=duration-2.
+  const startT = 2;
+  const endT = Math.max(startT + 1, duration - 2);
+  const span = endT - startT;
+  for (let i = 0; i < tier.pipes; i++) {
+    const t = startT + ((i + 0.5) / tier.pipes) * span;
     const y = GAP_Y_MIN + r() * (GAP_Y_MAX - GAP_Y_MIN);
     out.push(obj("pipe", t, y));
-    // Coins are placed in a dedicated 60-coin pass below — not per pipe.
-
-    if (withExtras && pipeIdx >= 1) {
-      // Drop one extra obstacle BETWEEN pipes so player can still squeeze
-      // through the pipe gap itself.
-      const tBetween = t + SPAWN_INTERVAL_SEC * 0.5;
-      const roll = r();
-      if (roll < spikeChance) {
-        // Snap to top (y<0.5) or bottom (y>0.5), cones face the player.
-        const side = r() < 0.5 ? 0.05 : 0.95;
-        out.push(obj("spike", tBetween, side));
-      } else if (roll < spikeChance + bladeChance) {
-        // Blade hangs from ceiling — its y is where the saw sits (in player's path).
-        const bladeY = 0.35 + r() * 0.35; // 0.35..0.70 of canvas height
-        out.push(obj("blade", tBetween, bladeY, { speed: 4 + r() * 3 }));
-      }
-    }
-    pipeIdx++;
   }
 
-  // ── 60 collectible coins spread across the whole level ──
-  // Placed evenly in time on varied Y positions inside the safe band
-  // so the player can scoop them by weaving up/down.
-  const COIN_COUNT = 60;
-  const startT = 2;
-  const endT = Math.max(startT + 1, duration - 1);
-  const step = (endT - startT) / COIN_COUNT;
-  for (let i = 0; i < COIN_COUNT; i++) {
-    const t = startT + i * step + (r() - 0.5) * step * 0.4;
-    // Y range avoids the very top/bottom; weaves with a sine for variety.
-    const yWeave = 0.35 + Math.sin(i * 0.7 + r() * 2) * 0.18 + (r() - 0.5) * 0.06;
-    const y = Math.max(0.18, Math.min(0.82, yWeave));
+  // Light coin trail along the safe band.
+  const coinStart = 1.5;
+  const coinEnd = Math.max(coinStart + 1, duration - 1);
+  const step = (coinEnd - coinStart) / tier.coins;
+  for (let i = 0; i < tier.coins; i++) {
+    const t = coinStart + i * step + (r() - 0.5) * step * 0.3;
+    const yWeave = 0.4 + Math.sin(i * 0.6 + r() * 2) * 0.18;
+    const y = Math.max(0.2, Math.min(0.8, yWeave));
     out.push(obj("coin", t, y));
   }
   return out;
